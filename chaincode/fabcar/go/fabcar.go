@@ -30,7 +30,7 @@ type Request struct {
 	Status        string `json:status`
 }
 type Transaction struct {
-	ObjectType   string        `json:objectType`
+	Owner        string        `json:owner`
 	Id           string        `json:id`
 	JsonObj      string        `json:jsonObj`
 	Quantity     string        `json:quantity`
@@ -74,7 +74,8 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 		return t.requestProduct(stub, args)
 	} else if function == "getproductByRange" { //get history of values for a marble
 		return t.getproductByRange(stub, args)
-
+	} else if function == "queryonCompositeKey" {
+		return t.queryonCompositeKey(stub, args)
 	}
 	fmt.Println("invoke did not find func: " + function) //error
 	return shim.Error("Received unknown function invocation")
@@ -106,7 +107,7 @@ func (t *SimpleChaincode) createProduct(stub shim.ChaincodeStubInterface, args [
 
 	// ==== Create marble object and marshal to JSON ====
 
-	Product := &Transaction{ObjectType: "Transaction", Id: Id, JsonObj: Jsonobj, Quantity: quantity, Transferrer: "Manufacturer"}
+	Product := &Transaction{Owner: "Manufacturer", Id: Id, JsonObj: Jsonobj, Quantity: quantity, Transferrer: "Manufacturer", Receiver: "Distributor"}
 
 	ProductJSONasBytes, err := json.Marshal(Product)
 	if err != nil {
@@ -172,7 +173,7 @@ func (t *SimpleChaincode) transferProduct(stub shim.ChaincodeStubInterface, args
 	if len(args) < 5 {
 		return shim.Error("Incorrect number of arguments. Expecting 2")
 	}
-
+	var requester string
 	id := args[0]
 
 	jsonobj := args[1]
@@ -194,6 +195,7 @@ func (t *SimpleChaincode) transferProduct(stub shim.ChaincodeStubInterface, args
 		for i := 0; i < len(requestArray.Decision); i++ {
 
 			if requestArray.Decision[i].RequestId == requestid {
+				requester = requestArray.Decision[i].Requester
 				requestArray.Decision[i].Status = "Approved"
 				break
 			}
@@ -227,10 +229,11 @@ func (t *SimpleChaincode) transferProduct(stub shim.ChaincodeStubInterface, args
 		newQuantity := intQuantity - requestedQuantity
 		stringQuantity := strconv.Itoa(newQuantity)
 		productToTransfer.Transferrer = newOwner
+		productToTransfer.Receiver = requester
 		productToTransfer.Quantity = stringQuantity
 		productToTransfer.JsonObj = jsonobj
 		productToTransfer.Dispatchedto = append(productToTransfer.Dispatchedto, deliveredto)
-
+		productToTransfer.Owner = newOwner
 		productJSONasBytes, _ := json.Marshal(productToTransfer)
 		err = stub.PutState(id, productJSONasBytes) //rewrite the marble
 		if err != nil {
@@ -435,4 +438,49 @@ func (t *SimpleChaincode) requestProduct(stub shim.ChaincodeStubInterface, args 
 		return shim.Error(err.Error())
 	}
 	return shim.Success(nil)
+}
+
+//==================partial composite keys=============================================================//
+func (t *SimpleChaincode) queryonCompositeKey(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+
+	//   0       1
+	// "transferer", "receiver"
+	if len(args) < 2 {
+		return shim.Error("Incorrect number of arguments. Expecting 2")
+	}
+
+	transferer := args[0]
+	receiver := args[1]
+	fmt.Println("- query product based on transferer and receiver ", transferer, receiver)
+
+	// Query the color~name index by color
+	// This will execute a key range query on all keys starting with 'color'
+	coloredMarbleResultsIterator, err := stub.GetStateByPartialCompositeKey("transferer~receiver", []string{transferer})
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	defer coloredMarbleResultsIterator.Close()
+
+	// Iterate through result set and for each marble found, transfer to newOwner
+	var i int
+	for i = 0; coloredMarbleResultsIterator.HasNext(); i++ {
+		// Note that we don't get the value (2nd return variable), we'll just get the marble name from the composite key
+		responseRange, err := coloredMarbleResultsIterator.Next()
+		if err != nil {
+			return shim.Error(err.Error())
+		}
+
+		// get the color and name from color~name composite key
+		objectType, compositeKeyParts, err := stub.SplitCompositeKey(responseRange.Key)
+		if err != nil {
+			return shim.Error(err.Error())
+		}
+		returnedColor := compositeKeyParts[0]
+		returnedMarbleName := compositeKeyParts[1]
+		returnedColorAsbytes, _ := json.Marshal(returnedColor)
+		fmt.Printf("- found a marble from index:%s color:%s name:%s\n", objectType, returnedColor, returnedMarbleName)
+		return shim.Success(returnedColorAsbytes)
+	}
+	return shim.Success(nil)
+
 }
