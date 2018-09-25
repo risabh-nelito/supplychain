@@ -121,3 +121,12 @@ function randomString(length, chars) {
 }
 
 }
+// router.post("/range",cors(),(req,res)=>{
+//     var ProductsOf=req.body.productsOf
+//     range.range(productsOf).then(results=>{
+//         console.log(results)
+//         res.status(results.status).json({message:results.message})
+//     }).catch(err=>{
+//         console.log(err)
+//     })
+//   })

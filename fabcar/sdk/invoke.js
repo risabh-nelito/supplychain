@@ -149,7 +149,7 @@ Fabric_Client.newDefaultKeyValueStore({ path: store_path
 		console.error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
 		throw new Error('Failed to send Proposal or receive valid response. Response null or status is not 200. exiting...');
 	}
-}).then((results) => {
+ }).then((results) => {
 	console.log('Send transaction promise and event listener promise have completed');
 	// check the results in the order the promises were added to the promise all list
 	if (results && results[0] && results[0].status === 'SUCCESS') {
