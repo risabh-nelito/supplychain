@@ -15,8 +15,10 @@ import (
 type SimpleChaincode struct {
 }
 type DeliveredTo struct {
-	Quantity string `json:quantity`
-	NewOwner string `json:quantity`
+	Quantity  string `json:quantity`
+	NewOwner  string `json:quantity`
+	RequestId string `json:reqeustId`
+	JsonObj   string `json:jsonObj`
 }
 type ApproveReject struct {
 	Decision []Request `json:decision`
@@ -24,6 +26,7 @@ type ApproveReject struct {
 type Request struct {
 	RequestedFrom string `json: requestedfrom`
 	RequestId     string `json: requestid`
+	JsonObj       string `json: jsonObj`
 	Id            string `json:id`
 	Quantity      string `json:quantity`
 	Requester     string `json:requester`
@@ -175,7 +178,6 @@ func (t *SimpleChaincode) transferProduct(stub shim.ChaincodeStubInterface, args
 	}
 	var requester string
 	id := args[0]
-
 	jsonobj := args[1]
 	quantity := args[2]
 	decision := args[3]
@@ -222,18 +224,56 @@ func (t *SimpleChaincode) transferProduct(stub shim.ChaincodeStubInterface, args
 		if err != nil {
 			return shim.Error(err.Error())
 		}
-		deliveredto := DeliveredTo{quantity, newOwner}
-		//change the owner
-		intQuantity, err := strconv.Atoi(productToTransfer.Quantity)
-		requestedQuantity, err := strconv.Atoi(quantity)
-		newQuantity := intQuantity - requestedQuantity
-		stringQuantity := strconv.Itoa(newQuantity)
-		productToTransfer.Transferrer = newOwner
-		productToTransfer.Receiver = requester
-		productToTransfer.Quantity = stringQuantity
-		productToTransfer.JsonObj = jsonobj
-		productToTransfer.Dispatchedto = append(productToTransfer.Dispatchedto, deliveredto)
-		productToTransfer.Owner = newOwner
+		if newOwner == "distributor" {
+			deliveredto := DeliveredTo{quantity, newOwner, requestid, jsonobj}
+			//change the owner
+			intQuantity, err := strconv.Atoi(productToTransfer.Quantity)
+			if err != nil {
+				return shim.Error(err.Error())
+			}
+			requestedQuantity, err := strconv.Atoi(quantity)
+			newQuantity := intQuantity - requestedQuantity
+			stringQuantity := strconv.Itoa(newQuantity)
+			productToTransfer.Transferrer = newOwner
+			productToTransfer.Receiver = requester
+			productToTransfer.Quantity = stringQuantity
+			productToTransfer.JsonObj = jsonobj
+			productToTransfer.Dispatchedto = append(productToTransfer.Dispatchedto, deliveredto)
+			//	productToTransfer.Owner = newOwner
+
+		} else if newOwner == "retailer" {
+			deliveredto := DeliveredTo{quantity, newOwner, requestid, jsonobj}
+			//change the owner
+			intQuantity, err := strconv.Atoi(productToTransfer.Dispatchedto[0].Quantity)
+			if err != nil {
+				return shim.Error(err.Error())
+			}
+			requestedQuantity, err := strconv.Atoi(quantity)
+			newQuantity := intQuantity - requestedQuantity
+			stringQuantity := strconv.Itoa(newQuantity)
+			productToTransfer.Transferrer = newOwner
+			productToTransfer.Receiver = requester
+			productToTransfer.Quantity = stringQuantity
+			productToTransfer.JsonObj = jsonobj
+			productToTransfer.Dispatchedto = append(productToTransfer.Dispatchedto, deliveredto)
+			//	productToTransfer.Owner = newOwner
+		} else if newOwner == "enduser" {
+			deliveredto := DeliveredTo{quantity, newOwner, requestid, jsonobj}
+			//change the owner
+			intQuantity, err := strconv.Atoi(productToTransfer.Dispatchedto[1].Quantity)
+			if err != nil {
+				return shim.Error(err.Error())
+			}
+			requestedQuantity, err := strconv.Atoi(quantity)
+			newQuantity := intQuantity - requestedQuantity
+			stringQuantity := strconv.Itoa(newQuantity)
+			productToTransfer.Transferrer = newOwner
+			productToTransfer.Receiver = requester
+			productToTransfer.Quantity = stringQuantity
+			productToTransfer.JsonObj = jsonobj
+			productToTransfer.Dispatchedto = append(productToTransfer.Dispatchedto, deliveredto)
+			//	productToTransfer.Owner = newOwner
+		}
 		productJSONasBytes, _ := json.Marshal(productToTransfer)
 		err = stub.PutState(id, productJSONasBytes) //rewrite the marble
 		if err != nil {
@@ -414,10 +454,13 @@ func (t *SimpleChaincode) requestProduct(stub shim.ChaincodeStubInterface, args 
 		jsonResp = "{\"Error\":\"Failed to get state for " + id + "\"}"
 		return shim.Error(jsonResp)
 	} else if valAsbytes == nil {
-		jsonResp = "{\"Error\":\"Marble does not exist: " + id + "\"}"
+		jsonResp = "{\"Error\":\"product with id: " + id + " does not exist:\"}"
 		return shim.Error(jsonResp)
 
 	}
+	productObject := Transaction{}
+	err = json.Unmarshal(valAsbytes, &productObject)
+
 	ArrayAsBytes, err := stub.GetState(requestFrom)
 	if err != nil {
 		return shim.Error("Failed to get marble: " + err.Error())
@@ -425,7 +468,7 @@ func (t *SimpleChaincode) requestProduct(stub shim.ChaincodeStubInterface, args 
 	requestArray := ApproveReject{}
 	err = json.Unmarshal(ArrayAsBytes, &requestArray)
 
-	request := Request{RequestedFrom: requestFrom, Id: id, RequestId: requestid, Quantity: quantity, Requester: requester, Status: "initiated"}
+	request := Request{RequestedFrom: requestFrom, JsonObj: productObject.JsonObj, Id: id, RequestId: requestid, Quantity: quantity, Requester: requester, Status: "initiated"}
 	requestArray.Decision = append(requestArray.Decision, request)
 
 	requestasBytes, err := json.Marshal(requestArray)

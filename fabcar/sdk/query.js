@@ -200,7 +200,6 @@ Fabric_Client.newDefaultKeyValueStore({ path: store_path
            
 		} else {
             var message=JSON.parse(query_responses[0].toString())
-            console.log("Response is ", message);
             return resolve({"status":200,message:message})
 		}
 	} else {

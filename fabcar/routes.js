@@ -48,7 +48,7 @@ module.exports = router => {
    })
 
 })
-router.post("/readProduct",cors(),(req,res)=>{
+router.post("/requestedProduct",cors(),(req,res)=>{
     var key=req.body.key
     if(!key){
         res.status(401).json({message:"please enter a valid key"})
@@ -61,14 +61,23 @@ router.post("/readProduct",cors(),(req,res)=>{
     })
 })
 
-router.get("/range",cors(),(req,res)=>{
-  range.range().then(results=>{
+router.post("/range",cors(),(req,res)=>{
+   var productsOf= req.body.productsOf;
+  range.range(productsOf).then(results=>{
       console.log(results)
       res.status(results.status).json({message:results.message})
   }).catch(err=>{
       console.log(err)
   })
 })
+router.get("/range",cors(),(req,res)=>{
+   range.allrange().then(results=>{
+       console.log(results)
+       res.status(results.status).json({message:results.message})
+   }).catch(err=>{
+       console.log(err)
+   })
+ })
 
 router.post("/transferProduct",cors(),(req,res)=>{
     var id, jsonobj,quantity,requestid,decission,requestedFrom,newOwner
@@ -98,6 +107,7 @@ router.post("/request",cors(),(req,res)=>{
     var requestedFrom = req.body.requestedFrom
     var quantity= req.body.quantity
     var requester= req.body.requester
+    console.log("request=========================>",id,requestid,requestedFrom,quantity,requester)
     request.request(id,requestid,requestedFrom,quantity,requester).then(results=>{
         res.send({status:200,message:results.message})
     }).catch(err=>{
