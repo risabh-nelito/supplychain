@@ -15,7 +15,7 @@ exports.request=(id,requestid,requestedFrom,quantity,requester)=>{
    bcSdk.request(requestObj)
    .then(results =>{
     console.log("result from sdk==========================================>",results)
-    resolve({ "status":results.status, "message": results.message })
+    resolve({ "status":results.status, "message": "request raised successfully your request id is:  "+requestid })
     }).catch(err=>{
         console.log(err)
     })

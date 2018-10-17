@@ -79,6 +79,9 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 		return t.getproductByRange(stub, args)
 	} else if function == "queryonCompositeKey" {
 		return t.queryonCompositeKey(stub, args)
+	} else if function == "deleteRequest" {
+		return t.deleteRequest(stub, args)
+
 	}
 	fmt.Println("invoke did not find func: " + function) //error
 	return shim.Error("Received unknown function invocation")
@@ -233,6 +236,9 @@ func (t *SimpleChaincode) transferProduct(stub shim.ChaincodeStubInterface, args
 			}
 			requestedQuantity, err := strconv.Atoi(quantity)
 			newQuantity := intQuantity - requestedQuantity
+			if newQuantity < 0 {
+				return shim.Error("reduce the quantity only" + productToTransfer.Quantity + "left")
+			}
 			stringQuantity := strconv.Itoa(newQuantity)
 			productToTransfer.Transferrer = newOwner
 			productToTransfer.Receiver = requester
@@ -250,6 +256,9 @@ func (t *SimpleChaincode) transferProduct(stub shim.ChaincodeStubInterface, args
 			}
 			requestedQuantity, err := strconv.Atoi(quantity)
 			newQuantity := intQuantity - requestedQuantity
+			if newQuantity < 0 {
+				return shim.Error("reduce the quantity only" + productToTransfer.Quantity + "left")
+			}
 			stringQuantity := strconv.Itoa(newQuantity)
 			productToTransfer.Transferrer = newOwner
 			productToTransfer.Receiver = requester
@@ -266,6 +275,9 @@ func (t *SimpleChaincode) transferProduct(stub shim.ChaincodeStubInterface, args
 			}
 			requestedQuantity, err := strconv.Atoi(quantity)
 			newQuantity := intQuantity - requestedQuantity
+			if newQuantity < 0 {
+				return shim.Error("reduce the quantity only" + productToTransfer.Quantity + "left")
+			}
 			stringQuantity := strconv.Itoa(newQuantity)
 			productToTransfer.Transferrer = newOwner
 			productToTransfer.Receiver = requester
@@ -524,6 +536,46 @@ func (t *SimpleChaincode) queryonCompositeKey(stub shim.ChaincodeStubInterface, 
 		fmt.Printf("- found a marble from index:%s color:%s name:%s\n", objectType, returnedColor, returnedMarbleName)
 		return shim.Success(returnedColorAsbytes)
 	}
+	return shim.Success(nil)
+
+}
+
+//=================================delete request============================================================//
+func (t *SimpleChaincode) deleteRequest(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+	//id            //requestid      //userType
+	if len(args) < 3 {
+		return shim.Error("invalid number of args")
+	}
+	id := args[0]
+	Requestid := args[1]
+	userType := args[2]
+
+	RequestAsbytes, err := stub.GetState(userType)
+
+	if err != nil {
+		return shim.Error("Failed to get requests for : " + userType + " " + err.Error())
+	}
+	requestArray := ApproveReject{}
+	err = json.Unmarshal(RequestAsbytes, &requestArray) //unmarshal it aka JSON.parse()
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	for i := 0; i < len(requestArray.Decision); i++ {
+
+		if requestArray.Decision[i].RequestId == Requestid && requestArray.Decision[i].Id == id {
+
+			requestArray.Decision[i] = requestArray.Decision[len(requestArray.Decision)-1] // Copy last element to index i
+			requestArray.Decision[len(requestArray.Decision)-1] = Request{}                // Erase last element (write zero value)
+			requestArray.Decision = requestArray.Decision[:len(requestArray.Decision)-1]
+			break
+		}
+	}
+	requestasBytes, _ := json.Marshal(requestArray)
+	err = stub.PutState(userType, requestasBytes) //rewrite the marble
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+
 	return shim.Success(nil)
 
 }
